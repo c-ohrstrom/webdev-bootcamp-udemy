@@ -2,9 +2,12 @@ const express = require("express"),
     app = express(),
     bodyParser = require("body-parser"),
     mongoose = require("mongoose"),
+    passport = require("passport"),
+    LocalStrategy = require("passport-local"),
+    passportLocalMongoose = require("passport-local-mongoose"),
     Campground = require("./models/campground"),
     Comment = require("./models/comment"),
-    // User = require("./models/user"),
+    User = require("./models/user"),
     seedDB = require("./seeds")
 
 mongoose.connect("mongodb://localhost:27017/yelp_camp",
@@ -20,6 +23,22 @@ app.use(express.static(__dirname + "/public"))
 app.set("view engine", "ejs")
 
 // seedDB();
+
+app.use(require("express-session")({
+    secret: "Yelp is camp",
+    resave: false,
+    saveUninitialized: false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+app.use((req, res, next) => {
+    res.locals.currentUser = req.user;
+    next();
+})
 
 app.get("/", (req, res) => {
     res.render("landing")
@@ -65,7 +84,7 @@ app.post("/campgrounds", (req, res) => {
     })
 })
 
-app.get("/campgrounds/:id/comments/new", (req, res) => {
+app.get("/campgrounds/:id/comments/new", isLoggedIn, (req, res) => {
     Campground.findById(req.params.id, (err, campground) => {
         if (err) {
             console.log(err)
@@ -75,7 +94,7 @@ app.get("/campgrounds/:id/comments/new", (req, res) => {
     });
 })
 
-app.post("/campgrounds/:id/comments", async (req, res) => {
+app.post("/campgrounds/:id/comments", isLoggedIn, async (req, res) => {
     let campground = await Campground.findById(req.params.id).exec();
 
     const comment = await Comment.create(req.body.comment);
@@ -84,7 +103,46 @@ app.post("/campgrounds/:id/comments", async (req, res) => {
     console.log("added: " + campground.comments)
     campground = await campground.save()
     res.redirect(`/campgrounds/${campground._id}`);
+});
+
+app.get("/register", (req, res) => {
+    res.render("register")
+});
+
+app.post("/register", (req, res) => {
+    const newUser = new User({ username: req.body.username })
+    User.register(newUser, req.body.password, (err, user) => {
+        if (err) {
+            console.log(err)
+            return res.render("/register")
+        }
+        passport.authenticate("local")(req, res, () => {
+            res.redirect("/campgrounds")
+        })
+    })
+});
+
+app.get("/login", (req, res) => {
+    res.render("login")
 })
+
+app.post("/login", passport.authenticate("local",
+    { successRedirect: "/campgrounds", failureRedirect: "/login" }),
+    (req, res) => {
+        res.send("login happen here")
+    });
+
+app.get("/logout", (req, res) => {
+    req.logout();
+    res.redirect("/campgrounds")
+});
+
+function isLoggedIn(req, res, next) {
+    if (req.isAuthenticated())
+        return next();
+
+    res.redirect("/login")
+}
 
 app.listen(3000, () => {
     console.log("working, on port 3000")
