@@ -1,7 +1,11 @@
 const express = require("express"),
     app = express(),
     bodyParser = require("body-parser"),
-    mongoose = require("mongoose")
+    mongoose = require("mongoose"),
+    Campground = require("./models/campground"),
+    Comment = require("./models/comment"),
+    // User = require("./models/user"),
+    seedDB = require("./seeds")
 
 mongoose.connect("mongodb://localhost:27017/yelp_camp",
     {
@@ -11,36 +15,11 @@ mongoose.connect("mongodb://localhost:27017/yelp_camp",
     .then(() => console.log("Connected to DB!"))
     .catch(error => console.log(error.message))
 
-const campgroundSchema = new mongoose.Schema({
-    name: String,
-    image: String,
-    description: String
-})
-
-let Campground = mongoose.model("Campground", campgroundSchema)
-
-// CampGround.create(
-//     {
-//         name: "Creepy Woods", image: "https://images.pexels.com/photos/1840421/pexels-photo-1840421.jpeg?auto=compress&cs=tinysrgb&h=350",
-//         description: "This is a camp in a creepy wood. Very scary!"
-//     },
-//     (err, camp) => {
-//         if (err)
-//             console.log(err)
-//         else {
-//             console.log("new created campground: ")
-//             console.log(camp)
-//         }
-//     })
-
 app.use(bodyParser.urlencoded({ extended: true }))
+app.use(express.static(__dirname + "/public"))
 app.set("view engine", "ejs")
 
-let campgrounds = [
-    { name: "Salmon Creek", image: "https://images.pexels.com/photos/699558/pexels-photo-699558.jpeg?auto=compress&cs=tinysrgb&h=350" },
-    { name: "Creepy Woods", image: "https://images.pexels.com/photos/1840421/pexels-photo-1840421.jpeg?auto=compress&cs=tinysrgb&h=350" },
-    { name: "Hairy Bear Salon", image: "https://pixabay.com/get/52e8d4444255ae14f1dc84609620367d1c3ed9e04e507440712979d6964ec6_340.jpg" },
-]
+// seedDB();
 
 app.get("/", (req, res) => {
     res.render("landing")
@@ -51,22 +30,24 @@ app.get("/campgrounds", (req, res) => {
         if (err)
             console.log(err)
         else
-            res.render("campgrounds", { campgrounds: allCampgrounds })
+            res.render("campgrounds/index", { campgrounds: allCampgrounds })
     });
 })
 
 app.get("/campgrounds/new", (req, res) => {
-    res.render("new")
+    res.render("campgrounds/new")
 })
 
 app.get("/campgrounds/:id", (req, res) => {
     let campId = req.params.id;
     console.log(req.params)
-    Campground.findById(campId, (err, camp) => {
+    Campground.findById(campId).populate("comments").exec((err, foundCamp) => {
         if (err)
             console.log(err)
-        else
-            res.render("show", { campground: camp });
+        else {
+            console.log(foundCamp)
+            res.render("campgrounds/show", { campground: foundCamp });
+        }
     })
 })
 
@@ -80,10 +61,30 @@ app.post("/campgrounds", (req, res) => {
         if (err)
             console.log(err)
         else
-            res.redirect("campgrounds")
+            res.redirect("campgrounds/index")
     })
 })
 
+app.get("/campgrounds/:id/comments/new", (req, res) => {
+    Campground.findById(req.params.id, (err, campground) => {
+        if (err) {
+            console.log(err)
+        } else {
+            res.render("comments/new", { campground: campground })
+        }
+    });
+})
+
+app.post("/campgrounds/:id/comments", async (req, res) => {
+    let campground = await Campground.findById(req.params.id).exec();
+
+    const comment = await Comment.create(req.body.comment);
+
+    campground.comments.push(comment);
+    console.log("added: " + campground.comments)
+    campground = await campground.save()
+    res.redirect(`/campgrounds/${campground._id}`);
+})
 
 app.listen(3000, () => {
     console.log("working, on port 3000")
