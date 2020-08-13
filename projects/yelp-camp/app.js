@@ -8,7 +8,11 @@ const express = require("express"),
     Campground = require("./models/campground"),
     Comment = require("./models/comment"),
     User = require("./models/user"),
-    seedDB = require("./seeds")
+    seedDB = require("./seeds");
+
+const commentRoutes = require("./routes/comments"),
+    campgroundRoutes = require("./routes/campgrounds"),
+    indexRoutes = require("./routes/index")
 
 mongoose.connect("mongodb://localhost:27017/yelp_camp",
     {
@@ -20,7 +24,9 @@ mongoose.connect("mongodb://localhost:27017/yelp_camp",
 
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(express.static(__dirname + "/public"))
-app.set("view engine", "ejs")
+app.set("view engine", "ejs");
+
+
 
 // seedDB();
 
@@ -40,109 +46,11 @@ app.use((req, res, next) => {
     next();
 })
 
-app.get("/", (req, res) => {
-    res.render("landing")
-})
 
-app.get("/campgrounds", (req, res) => {
-    Campground.find({}, (err, allCampgrounds) => {
-        if (err)
-            console.log(err)
-        else
-            res.render("campgrounds/index", { campgrounds: allCampgrounds })
-    });
-})
+app.use("/", indexRoutes);
+app.use("/campgrounds", campgroundRoutes);
+app.use("/campgrounds/:id/comments", commentRoutes);
 
-app.get("/campgrounds/new", (req, res) => {
-    res.render("campgrounds/new")
-})
-
-app.get("/campgrounds/:id", (req, res) => {
-    let campId = req.params.id;
-    console.log(req.params)
-    Campground.findById(campId).populate("comments").exec((err, foundCamp) => {
-        if (err)
-            console.log(err)
-        else {
-            console.log(foundCamp)
-            res.render("campgrounds/show", { campground: foundCamp });
-        }
-    })
-})
-
-app.post("/campgrounds", (req, res) => {
-    let name = req.body.name;
-    let image = req.body.image;
-    let description = req.body.description
-    let newCampground = { name: name, image: image, description: description };
-
-    Campground.create(newCampground, (err, newlyCreated) => {
-        if (err)
-            console.log(err)
-        else
-            res.redirect("campgrounds/index")
-    })
-})
-
-app.get("/campgrounds/:id/comments/new", isLoggedIn, (req, res) => {
-    Campground.findById(req.params.id, (err, campground) => {
-        if (err) {
-            console.log(err)
-        } else {
-            res.render("comments/new", { campground: campground })
-        }
-    });
-})
-
-app.post("/campgrounds/:id/comments", isLoggedIn, async (req, res) => {
-    let campground = await Campground.findById(req.params.id).exec();
-
-    const comment = await Comment.create(req.body.comment);
-
-    campground.comments.push(comment);
-    console.log("added: " + campground.comments)
-    campground = await campground.save()
-    res.redirect(`/campgrounds/${campground._id}`);
-});
-
-app.get("/register", (req, res) => {
-    res.render("register")
-});
-
-app.post("/register", (req, res) => {
-    const newUser = new User({ username: req.body.username })
-    User.register(newUser, req.body.password, (err, user) => {
-        if (err) {
-            console.log(err)
-            return res.render("/register")
-        }
-        passport.authenticate("local")(req, res, () => {
-            res.redirect("/campgrounds")
-        })
-    })
-});
-
-app.get("/login", (req, res) => {
-    res.render("login")
-})
-
-app.post("/login", passport.authenticate("local",
-    { successRedirect: "/campgrounds", failureRedirect: "/login" }),
-    (req, res) => {
-        res.send("login happen here")
-    });
-
-app.get("/logout", (req, res) => {
-    req.logout();
-    res.redirect("/campgrounds")
-});
-
-function isLoggedIn(req, res, next) {
-    if (req.isAuthenticated())
-        return next();
-
-    res.redirect("/login")
-}
 
 app.listen(3000, () => {
     console.log("working, on port 3000")
