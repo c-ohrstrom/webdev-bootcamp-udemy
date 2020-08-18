@@ -2,6 +2,8 @@ const express = require("express"),
     router = express.Router(),
     Campground = require("../models/campground");
 
+const middleware = require("../middleware");
+
 
 router.get("/", (req, res) => {
     Campground.find({}, (err, allCampgrounds) => {
@@ -12,25 +14,26 @@ router.get("/", (req, res) => {
     });
 })
 
-router.get("/new", isLoggedIn, (req, res) => {
+router.get("/new", middleware.isLoggedIn, (req, res) => {
     res.render("campgrounds/new")
 })
 
+
 router.get("/:id", (req, res) => {
-    let campId = req.params.id;
-    console.log(campId)
-    console.log(req.params)
-    Campground.findById(campId).populate("comments").exec((err, foundCamp) => {
-        if (err)
-            console.log(err)
-        else {
-            console.log(foundCamp)
-            res.render("campgrounds/show", { campground: foundCamp });
+    const campId = req.params.id;
+    console.log("campId: " + campId)
+    Campground.findById(campId).populate("comments").exec(function (err, foundCampground) {
+        if (err || !foundCampground) {
+            console.log(err);
+            // req.flash('error', 'Sorry, that campground does not exist!');
+            return res.redirect('/campgrounds');
         }
-    })
+        //render show template with that campground
+        return res.render("campgrounds/show", { campground: foundCampground });
+    });
 })
 //CREATE
-router.post("/", isLoggedIn, (req, res) => {
+router.post("/", middleware.isLoggedIn, (req, res) => {
     let name = req.body.name;
     let image = req.body.image;
     let description = req.body.description
@@ -49,11 +52,46 @@ router.post("/", isLoggedIn, (req, res) => {
     })
 })
 
-function isLoggedIn(req, res, next) {
-    if (req.isAuthenticated())
-        return next();
+//EDIT
+router.get("/:id/edit", middleware.checkCampgroundOwnership, async (req, res) => {
 
-    res.redirect("/login")
-}
+    let campground = await Campground.findOne({ _id: req.params.id });
+    res.render("campgrounds/edit", { campground: campground })
+
+})
+//UPDATE
+router.put("/:id", middleware.isLoggedIn, (req, res) => {
+
+    let updateData = req.body.campground;
+    Campground.findByIdAndUpdate(req.params.id, updateData, (err, camp) => {
+        if (err) {
+            res.redirect("/campgrounds")
+        } else {
+            res.redirect("/campgrounds/" + req.params.id)
+        }
+    });
+
+})
+
+//DELETE
+router.delete("/:id", middleware.checkCampgroundOwnership, async (req, res) => {
+
+    try {
+        let result = await Campground.findOneAndRemove(req.params.id, { useFindAndModify: false }).exec();
+        console.log(result);
+        res.redirect("/campgrounds")
+    } catch (err) {
+        console.log(err);
+        res.redirect("/campgrounds")
+    }
+    // Campground.findByIdAndRemove(req.params.id, (err) => {
+    //     if (err) {
+    //         console.log(err)
+    //         res.redirect("/campgrounds");
+    //     }
+    //     else
+    //         res.redirect("/campgrounds")
+    // });
+})
 
 module.exports = router;
