@@ -35,6 +35,7 @@ router.get("/:id", (req, res) => {
 //CREATE
 router.post("/", middleware.isLoggedIn, (req, res) => {
     let name = req.body.name;
+    let price = req.body.price;
     let image = req.body.image;
     let description = req.body.description
     var author = {
@@ -42,7 +43,7 @@ router.post("/", middleware.isLoggedIn, (req, res) => {
         username: req.user.username
     };
 
-    let newCampground = { name: name, image: image, description: description, author: author };
+    let newCampground = { name: name, image: image, description: description, author: author, price: price };
 
     Campground.create(newCampground, (err, newlyCreated) => {
         if (err)

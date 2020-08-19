@@ -27,6 +27,7 @@ router.post("/", middleware.isLoggedIn, async (req, res) => {
     campground.comments.push(newComment);
     console.log(newComment)
     campground = await campground.save()
+    req.flash("success", "Successfully added comment")
     res.redirect(`/campgrounds/${campground._id}`);
 });
 
@@ -58,6 +59,7 @@ router.delete("/:comment_id", middleware.checkCommentOwnership, async (req, res)
     try {
         let result = await Comment.findByIdAndDelete(req.params.comment_id, { useFindAndModify: true }).exec();
         console.log(result);
+        req.flash("success", "Comment deleted")
         res.redirect("/campgrounds/" + req.params.id)
     } catch (err) {
         console.log(err);

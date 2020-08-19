@@ -8,7 +8,8 @@ const express = require("express"),
     Campground = require("./models/campground"),
     Comment = require("./models/comment"),
     User = require("./models/user"),
-    seedDB = require("./seeds");
+    seedDB = require("./seeds"),
+    flash = require("connect-flash");
 
 const commentRoutes = require("./routes/comments"),
     campgroundRoutes = require("./routes/campgrounds"),
@@ -26,7 +27,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + "/public"))
 app.set("view engine", "ejs");
 app.use(methodOverride("_method"));
-
+app.use(flash());
 
 // seedDB();
 
@@ -43,6 +44,9 @@ passport.deserializeUser(User.deserializeUser());
 
 app.use((req, res, next) => {
     res.locals.currentUser = req.user;
+    res.locals.error = req.flash("error");
+    res.locals.success = req.flash("success");
+
     next();
 })
 
@@ -51,7 +55,7 @@ app.use("/", indexRoutes);
 app.use("/campgrounds", campgroundRoutes);
 app.use("/campgrounds/:id/comments", commentRoutes);
 
-
-app.listen(3000, () => {
+const port = process.env.PORT || 3000
+app.listen(port, () => {
     console.log("working, on port 3000")
 })
